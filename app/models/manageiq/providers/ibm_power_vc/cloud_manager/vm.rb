@@ -9,10 +9,23 @@ class ManageIQ::Providers::IbmPowerVc::CloudManager::Vm < ManageIQ::Providers::O
   end
   supports :launch_html5_console
 
+  supports :native_console do
+    reason ||= _("Management Console not supported because VM is orphaned") if orphaned?
+    reason ||= _("Management Console not supported because VM is archived") if archived?
+    unsupported_reason_add(:native_console, reason) if reason
+  end
+
   def remote_console_acquire_ticket(_userid, _originating_server, _console_type)
     super
   rescue => err
     msg = err.response.reason_phrase == 'Not Implemented' ? 'PowerVM NovaLink is required for VM console access.' : err.response.reason_phrase
     raise MiqException::MiqVmError, msg
+  end
+
+  def console_url
+    params = URI.encode_www_form(:id => ems_ref, :name => name)
+    URI::HTTPS.build(:host  => ext_management_system.hostname || ext_management_system.ipaddress,
+                     :path  => "/vms/edit",
+                     :query => params)
   end
 end
